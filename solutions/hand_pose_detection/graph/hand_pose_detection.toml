@@ -1,0 +1,45 @@
+[driver]
+dir = [
+"/usr/local/share/modelbox/solutions/hand_pose_detection"
+]
+[flow]
+name = "hand_pose_detection"
+desc = "hand pose detection"
+[log]
+level="INFO"
+[graph]
+format = "graphviz"
+graphconf = """digraph emotion_detection {
+    node [shape=Mrecord]
+    input[type=input]
+    image_decoder[type=flowunit, flowunit=image_decoder, device=cpu, pix_fmt=rgb]
+    image_resize[type=flowunit, flowunit=resize, device=cuda, devicdid=0, width=320, height=320]
+    image_preprocess[type=flowunit, flowunit=image_preprocess, device=cuda, deviceid=0, output_layout="chw", mean="123.675, 116.28, 103.53", standard_deviation_inverse="0.017125, 0.017507, 0.017429"]
+    hand_detection[type=flowunit, flowunit=hand_detection, device=cuda, deviceid=0, batch_size=1]
+    yolox_post[type=flowunit, flowunit=yolox_post, device=cpu]
+    expand_box[type=flowunit, flowunit=expand_box, device=cpu]
+    hand_resize[type=flowunit, flowunit=resize, device=cuda, deviceid=0, width=256, height=256]
+    hand_pose_preprocess[type=flowunit, flowunit=image_preprocess, device=cuda, devicdid=0, output_layout="chw", mean="128.0, 128.0, 128.0", standard_deviation_inverse="0.00390625, 0.00390625, 0.00390625"]
+    hand_pose_detection[type=flowunit, flowunit=hand_pose_detection, device=cuda, deviceid=0]
+    collapse_hand_pose[type=flowunit, flowunit=collapse_hand_pose, device=cpu]
+    draw_hand_pose[type=flowunit, flowunit=draw_hand_pose, device=cpu]
+    generate_result[type=flowunit, flowunit=generate_result, device=cpu]
+    output[type=output]
+
+    input -> image_decoder:in_encoded_image
+    image_decoder:out_image -> image_resize:in_image
+    image_resize:out_image -> image_preprocess:in_image
+    image_preprocess:out_data -> hand_detection:input
+    hand_detection:output -> yolox_post:in_feat
+    image_decoder:out_image -> yolox_post:in_image
+    yolox_post:has_hand -> expand_box:in_data
+    expand_box:roi_image -> hand_resize:in_image
+    hand_resize:out_image -> hand_pose_preprocess:in_image
+    hand_pose_preprocess:out_data -> hand_pose_detection:input
+    hand_pose_detection:output -> collapse_hand_pose:in_feat
+    collapse_hand_pose:out_data -> draw_hand_pose:in_pose
+    yolox_post:has_hand -> draw_hand_pose:in_hand_image
+    draw_hand_pose:out_data -> generate_result:in_data
+    yolox_post:no_hand -> generate_result:in_data
+    generate_result:out_data -> output
+}"""
